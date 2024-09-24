@@ -1,0 +1,68 @@
+const AWS = require('@aws-sdk/client-dynamodb');
+const { DynamoDBClient, CreateTableCommand } = AWS;
+
+// Configure the DynamoDB client
+const ddbClient = new DynamoDBClient({ region: 'us-east-2' });
+
+// Function to create a table
+async function createTable(params) {
+  try {
+    const data = await ddbClient.send(new CreateTableCommand(params));
+    console.log("Table created successfully:", data);
+    return data;
+  } catch (err) {
+    console.error("Error creating table:", err);
+    throw err;
+  }
+}
+
+// Define table schemas
+const tableSchemas = [
+  {
+    TableName: 'ACI_Users',
+    KeySchema: [{ AttributeName: 'userId', KeyType: 'HASH' }],
+    AttributeDefinitions: [{ AttributeName: 'userId', AttributeType: 'S' }],
+    ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 }
+  },
+  {
+    TableName: 'ACI_Courses',
+    KeySchema: [{ AttributeName: 'courseId', KeyType: 'HASH' }],
+    AttributeDefinitions: [{ AttributeName: 'courseId', AttributeType: 'S' }],
+    ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 }
+  },
+  {
+    TableName: 'ACI_Enrollments',
+    KeySchema: [
+      { AttributeName: 'userId', KeyType: 'HASH' },
+      { AttributeName: 'courseId', KeyType: 'RANGE' }
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'userId', AttributeType: 'S' },
+      { AttributeName: 'courseId', AttributeType: 'S' }
+    ],
+    ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 }
+  },
+  {
+    TableName: 'ACI_Progress',
+    KeySchema: [
+      { AttributeName: 'userId', KeyType: 'HASH' },
+      { AttributeName: 'courseId', KeyType: 'RANGE' }
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'userId', AttributeType: 'S' },
+      { AttributeName: 'courseId', AttributeType: 'S' }
+    ],
+    ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 }
+  }
+];
+
+// Create tables
+async function setupDynamoDB() {
+  for (const schema of tableSchemas) {
+    await createTable(schema);
+  }
+  console.log("All tables created successfully");
+}
+
+// Run the setup
+setupDynamoDB().catch(console.error);
