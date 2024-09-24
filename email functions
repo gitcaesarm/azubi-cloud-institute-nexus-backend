@@ -1,0 +1,136 @@
+const { DynamoDB } = require("@aws-sdk/client-dynamodb");
+const { marshall, unmarshall } = require("@aws-sdk/util-dynamodb");
+
+const dynamodb = new DynamoDB({ region: "us-east-2" });
+
+// Utility function to convert standard JSON to DynamoDB JSON
+const toDynamoDBItem = (item) => marshall(item);
+
+// Utility function to convert DynamoDB JSON to standard JSON
+const fromDynamoDBItem = (item) => unmarshall(item);
+
+// Function to get a student record by email
+async function getStudentByEmail(email) {
+  const params = {
+    TableName: "ACI_Students",
+    Key: marshall({ Email: email }),
+  };
+
+  try {
+    const { Item } = await dynamodb.getItem(params);
+    return Item ? fromDynamoDBItem(Item) : null;
+  } catch (error) {
+    console.error("Error fetching student:", error);
+    throw error;
+  }
+}
+
+// Function to update a student's performance data
+async function updateStudentPerformance(email, performanceData) {
+  const params = {
+    TableName: "ACI_Students",
+    Key: marshall({ Email: email }),
+    UpdateExpression: "SET Attendance = :a, Score = :s, #qc = :qc, #ac = :ac, Compliance = :c, #r = :r, QuizSubmitted = :qs",
+    ExpressionAttributeNames: {
+      "#qc": "Q-Comp",
+      "#ac": "A-Comp",
+      "#r": "Rank"
+    },
+    ExpressionAttributeValues: marshall({
+      ":a": performanceData.Attendance,
+      ":s": performanceData.Score,
+      ":qc": performanceData["Q-Comp"],
+      ":ac": performanceData["A-Comp"],
+      ":c": performanceData.Compliance,
+      ":r": performanceData.Rank,
+      ":qs": performanceData.QuizSubmitted
+    }),
+    ReturnValues: "ALL_NEW"
+  };
+
+  try {
+    const { Attributes } = await dynamodb.updateItem(params);
+    return fromDynamoDBItem(Attributes);
+  } catch (error) {
+    console.error("Error updating student performance:", error);
+    throw error;
+  }
+}
+
+// Function to get all courses
+async function getAllCourses() {
+  const params = {
+    TableName: "ACI_Courses",
+  };
+
+  try {
+    const { Items } = await dynamodb.scan(params);
+    return Items.map(fromDynamoDBItem);
+  } catch (error) {
+    console.error("Error fetching courses:", error);
+    throw error;
+  }
+}
+
+// Function to enroll a student in a course
+async function enrollStudentInCourse(email, courseId) {
+  const params = {
+    TableName: "ACI_Enrollments",
+    Item: marshall({
+      StudentEmail: email,
+      CourseId: courseId,
+      EnrollmentDate: new Date().toISOString()
+    }),
+  };
+
+  try {
+    await dynamodb.putItem(params);
+    return { message: "Enrollment successful" };
+  } catch (error) {
+    console.error("Error enrolling student:", error);
+    throw error;
+  }
+}
+
+// Example usage
+async function main() {
+  try {
+    // Fetch a student record
+    const student = await getStudentByEmail("caesar.morris@azubiafrica.org");
+    console.log("Student record:", student);
+
+    // Update student performance
+    const updatedStudent = await updateStudentPerformance("caesar.morris@azubiafrica.org", {
+      Attendance: 98.5,
+      Score: 95.5,
+      "Q-Comp": "Very High",
+      "A-Comp": "High",
+      Compliance: "High Compliance",
+      Rank: "2",
+      QuizSubmitted: 18
+    });
+    console.log("Updated student record:", updatedStudent);
+
+    // Fetch all courses
+    const courses = await getAllCourses();
+    console.log("Available courses:", courses);
+
+    // Enroll student in a course
+    const enrollment = await enrollStudentInCourse("caesar.morris@azubiafrica.org", "COURSE-001");
+    console.log("Enrollment result:", enrollment);
+
+  } catch (error) {
+    console.error("An error occurred:", error);
+  }
+}
+
+main();
+
+module.exports = {
+  getStudentByEmail,
+  updateStudentPerformance,
+  getAllCourses,
+  enrollStudentInCourse,
+  toDynamoDBItem,
+  fromDynamoDBItem
+};
